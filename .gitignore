@@ -1,10 +1,6 @@
 # Environment variables
 backend/.env
 
-# Data directories
-backend/data/
-backend/sap-order-to-cash-dataset/
-
 # Python cache
 __pycache__/
 *.pyc
