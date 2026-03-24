@@ -2,7 +2,16 @@
 
 A comprehensive graph-based data visualization and natural language query system for SAP Order-to-Cash datasets, built with FastAPI, DuckDB, Groq LLM, and React.
 
-## 🏗️ Architecture
+## � **Live Demo**
+**🚀 Production URL**: https://sap-o2c-graph-production-c7ad.up.railway.app/
+
+Explore the interactive SAP Order-to-Cash dashboard with:
+- 📊 **Graph Visualization**: Interactive node-based data exploration
+- 💬 **Natural Language Queries**: Ask questions about your SAP data in plain English
+- 🎨 **Enterprise UI**: GitHub-inspired dark theme dashboard
+- ⚡ **Real-time Analysis**: Instant SQL generation and results
+
+## �️ Architecture
 
 ### Backend Stack
 - **FastAPI**: REST API with CORS support
@@ -206,7 +215,25 @@ Response:
 ### Frontend Optimization
 - **Virtual scrolling**: Handles large result sets efficiently
 - **Debounced queries**: Prevents excessive API calls
-- **Component memoization**: Reduces unnecessary re-renders
+- Component memoization: Reduces unnecessary re-renders
+
+## 🚀 Deployment
+
+### Railway (Production)
+The application is deployed on Railway at: https://sap-o2c-graph-production-c7ad.up.railway.app/
+
+**Deployment Setup**:
+- **Backend**: FastAPI with Railway Procfile configuration
+- **Environment Variables**: GROQ_API_KEY configured in Railway
+- **Database**: DuckDB with JSONL data loading
+- **Frontend**: React app served from backend static files
+
+### Local Development
+Follow the Quick Start guide above to run the application locally.
+
+### Environment Configuration
+- **Backend**: Set `GROQ_API_KEY` in `.env` file
+- **Frontend**: Set `VITE_API_URL` in `.env` file (defaults to `http://localhost:8000`)
 
 ## 🐛 Troubleshooting
 
