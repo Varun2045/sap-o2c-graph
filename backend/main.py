@@ -149,6 +149,7 @@ SCHEMA_CONTEXT = """
 Tables available:
 - sales_order_headers: salesOrder, soldToParty, CAST(totalNetAmount AS DOUBLE) AS totalNetAmount, overallDeliveryStatus, transactionCurrency, creationDate, salesOrderType
   NOTE: always write SUM(CAST(totalNetAmount AS DOUBLE)) for any sum
+  NOTE: billingDocumentIsCancelled does NOT exist in sales_order_headers, use billing_document_headers table for cancellation status
 - billing_document_headers: billingDocument, accountingDocument, soldToParty, totalNetAmount, billingDocumentIsCancelled, cancelledBillingDocument, billingDocumentDate
 - outbound_delivery_headers: deliveryDocument, shippingPoint, overallGoodsMovementStatus, creationDate
 - journal_entry_items_accounts_receivable: accountingDocument, referenceDocument, customer, amountInTransactionCurrency, clearingAccountingDocument, postingDate, glAccount
@@ -158,6 +159,9 @@ Key relationships:
 - billing_document_headers.accountingDocument = journal_entry_items_accounts_receivable.accountingDocument
 - journal_entry_items_accounts_receivable.referenceDocument = billing_document_headers.billingDocument
 - billing_document_headers.soldToParty = sales_order_headers.soldToParty (same customer)
+
+IMPORTANT: billingDocumentIsCancelled column only exists in billing_document_headers table, not in sales_order_headers.
+To filter sales orders by billing cancellation status, you must JOIN with billing_document_headers table.
 """
 
 class QueryRequest(BaseModel):
@@ -193,11 +197,13 @@ Rules:
 - No markdown, no explanation, no backticks
 - Use LIMIT 20 unless asking for totals/counts
 - Only use tables listed in the schema above
-- billingDocumentIsCancelled is a BOOLEAN column, use TRUE or FALSE not 'X'
+- billingDocumentIsCancelled is a BOOLEAN column that ONLY exists in billing_document_headers table, use TRUE or FALSE not 'X'
 - For boolean comparisons always use: WHERE billingDocumentIsCancelled = TRUE
 - totalNetAmount and amountInTransactionCurrency are stored as VARCHAR, always cast them: CAST(totalNetAmount AS DECIMAL)
 - ALWAYS use SUM(CAST(totalNetAmount AS DOUBLE)) never SUM(totalNetAmount)
 - ALWAYS use SUM(CAST(amountInTransactionCurrency AS DOUBLE)) for amounts
+- CRITICAL: If the question asks about billing cancellation status for sales orders, you MUST JOIN sales_order_headers with billing_document_headers
+- Example join pattern: FROM sales_order_headers soh JOIN billing_document_headers bdh ON soh.soldToParty = bdh.soldToParty
 """
 
     sql_response = client.chat.completions.create(
