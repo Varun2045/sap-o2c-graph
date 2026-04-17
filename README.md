@@ -2,7 +2,7 @@
 
 A comprehensive graph-based data visualization and natural language query system for SAP Order-to-Cash datasets, built with FastAPI, DuckDB, Groq LLM, and React.
 
-## � **Live Demo**
+## 🌐 **Live Demo**
 **🚀 Production URL**: https://sap-o2c-graph-production-c7ad.up.railway.app/
 
 Explore the interactive SAP Order-to-Cash dashboard with:
@@ -11,7 +11,7 @@ Explore the interactive SAP Order-to-Cash dashboard with:
 - 🎨 **Enterprise UI**: GitHub-inspired dark theme dashboard
 - ⚡ **Real-time Analysis**: Instant SQL generation and results
 
-## �️ Architecture
+## 🏗️ Architecture
 
 ### Backend Stack
 - **FastAPI**: REST API with CORS support
