@@ -8,10 +8,12 @@ from pathlib import Path
 from dotenv import load_dotenv
 from groq import Groq
 
+# Load environment variables
 load_dotenv()
 
-app = FastAPI()
+app = FastAPI(title="SAP O2C Graph API")
 
+# Enable CORS for frontend connectivity
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -25,10 +27,10 @@ con = duckdb.connect()
 
 TABLES = {
     "sales_order_headers":                      "salesOrder",
-    "billing_document_headers":                 "billingDocument",
+    "billing_document_headers":                  "billingDocument",
     "outbound_delivery_headers":                "deliveryDocument",
     "journal_entry_items_accounts_receivable":  "accountingDocument",
-    "payments_accounts_receivable":             "accountingDocument",
+    "payments_accounts_receivable":              "accountingDocument",
     "business_partners":                        "businessPartner",
     "products":                                 "product",
     "plants":                                   "plant",
@@ -44,32 +46,26 @@ def load_tables():
         if not jsonl_files:
             print(f"[WARN] no jsonl files in {folder_path}")
             continue
-        # read all jsonl files into a list
-        rows = []
-        for f in jsonl_files:
-            with open(f) as fh:
-                for line in fh:
-                    line = line.strip()
-                    if line:
-                        rows.append(json.loads(line))
-        if not rows:
-            continue
-        # create table from JSON
+        
+        # Initial table creation from the first file
         con.execute(f"DROP TABLE IF EXISTS {folder}")
         con.execute(f"CREATE TABLE {folder} AS SELECT * FROM read_json_auto(?)", [str(jsonl_files[0])])
-        # if multiple files, union them
+        
+        # If multiple files exist, union them into the table
         if len(jsonl_files) > 1:
             for extra in jsonl_files[1:]:
                 try:
                     con.execute(f"INSERT INTO {folder} SELECT * FROM read_json_auto(?)", [str(extra)])
                 except Exception as e:
                     print(f"[WARN] insert failed for {extra}: {e}")
+        
         count = con.execute(f"SELECT COUNT(*) FROM {folder}").fetchone()[0]
         print(f"[OK] loaded {folder}: {count} rows")
 
+# Run table loading on startup
 load_tables()
 
-# Fix VARCHAR numeric columns
+# Fix VARCHAR numeric columns for calculations
 try:
     con.execute("ALTER TABLE sales_order_headers ADD COLUMN totalNetAmountNum DECIMAL AS (CAST(totalNetAmount AS DECIMAL))")
 except:
@@ -79,7 +75,18 @@ try:
 except:
     pass
 
-# ── Graph endpoint ─────────────────────────────────────────────────────────────
+# ── Routes ───────────────────────────────────────────────────────────────────
+
+@app.get("/")
+def read_root():
+    """Root endpoint to prevent 404 errors on home page."""
+    return {
+        "status": "Active",
+        "service": "SAP O2C Graph API",
+        "documentation": "/docs",
+        "message": "The API is running successfully."
+    }
+
 @app.get("/graph")
 def get_graph():
     nodes = []
@@ -124,8 +131,6 @@ def get_graph():
 
     return {"nodes": nodes, "edges": edges}
 
-
-# ── Suggested queries ──────────────────────────────────────────────────────────
 @app.get("/suggested-queries")
 def suggested_queries():
     return {"queries": [
@@ -136,8 +141,8 @@ def suggested_queries():
         "Show sales orders with delivery status C",
     ]}
 
+# ── AI Query Engine ──────────────────────────────────────────────────────────
 
-# ── Chat / query endpoint ──────────────────────────────────────────────────────
 DOMAIN_KEYWORDS = [
     "sales", "order", "delivery", "billing", "invoice", "payment",
     "customer", "journal", "amount", "revenue", "document", "sap",
@@ -149,19 +154,10 @@ SCHEMA_CONTEXT = """
 Tables available:
 - sales_order_headers: salesOrder, soldToParty, CAST(totalNetAmount AS DOUBLE) AS totalNetAmount, overallDeliveryStatus, transactionCurrency, creationDate, salesOrderType
   NOTE: always write SUM(CAST(totalNetAmount AS DOUBLE)) for any sum
-  NOTE: billingDocumentIsCancelled does NOT exist in sales_order_headers, use billing_document_headers table for cancellation status
 - billing_document_headers: billingDocument, accountingDocument, soldToParty, totalNetAmount, billingDocumentIsCancelled, cancelledBillingDocument, billingDocumentDate
 - outbound_delivery_headers: deliveryDocument, shippingPoint, overallGoodsMovementStatus, creationDate
 - journal_entry_items_accounts_receivable: accountingDocument, referenceDocument, customer, amountInTransactionCurrency, clearingAccountingDocument, postingDate, glAccount
 - payments_accounts_receivable: accountingDocument, customer, amountInTransactionCurrency, clearingAccountingDocument, postingDate
-
-Key relationships:
-- billing_document_headers.accountingDocument = journal_entry_items_accounts_receivable.accountingDocument
-- journal_entry_items_accounts_receivable.referenceDocument = billing_document_headers.billingDocument
-- billing_document_headers.soldToParty = sales_order_headers.soldToParty (same customer)
-
-IMPORTANT: billingDocumentIsCancelled column only exists in billing_document_headers table, not in sales_order_headers.
-To filter sales orders by billing cancellation status, you must JOIN with billing_document_headers table.
 """
 
 class QueryRequest(BaseModel):
@@ -171,74 +167,47 @@ class QueryRequest(BaseModel):
 def run_query(req: QueryRequest):
     q = req.query.lower()
 
-    # Guardrail
     if not any(kw in q for kw in DOMAIN_KEYWORDS):
         return {
-            "answer": "This system is designed to answer questions related to the SAP Order-to-Cash dataset only. Please ask about sales orders, deliveries, billing documents, payments, or customers.",
+            "answer": "Please ask a question related to SAP Order-to-Cash data.",
             "sql": None,
             "data": []
         }
 
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
-        return {"answer": "GROQ_API_KEY not set in .env file.", "sql": None, "data": []}
+        return {"answer": "GROQ_API_KEY not configured.", "sql": None, "data": []}
 
     client = Groq(api_key=api_key)
 
     # Step 1: Generate SQL
-    sql_prompt = f"""You are a SQL expert. Given this database schema:
-
-{SCHEMA_CONTEXT}
-
-Write a single DuckDB SQL query to answer this question: "{req.query}"
-
-Rules:
-- Return ONLY the SQL query, nothing else
-- No markdown, no explanation, no backticks
-- Use LIMIT 20 unless asking for totals/counts
-- Only use tables listed in the schema above
-- billingDocumentIsCancelled is a BOOLEAN column that ONLY exists in billing_document_headers table, use TRUE or FALSE not 'X'
-- For boolean comparisons always use: WHERE billingDocumentIsCancelled = TRUE
-- totalNetAmount and amountInTransactionCurrency are stored as VARCHAR, always cast them: CAST(totalNetAmount AS DECIMAL)
-- ALWAYS use SUM(CAST(totalNetAmount AS DOUBLE)) never SUM(totalNetAmount)
-- ALWAYS use SUM(CAST(amountInTransactionCurrency AS DOUBLE)) for amounts
-- CRITICAL: If the question asks about billing cancellation status for sales orders, you MUST JOIN sales_order_headers with billing_document_headers
-- Example join pattern: FROM sales_order_headers soh JOIN billing_document_headers bdh ON soh.soldToParty = bdh.soldToParty
-"""
-
+    sql_prompt = f"You are a SQL expert. Based on this schema: {SCHEMA_CONTEXT}, write a DuckDB SQL query for: {req.query}. Return ONLY SQL."
+    
     sql_response = client.chat.completions.create(
         model="llama-3.3-70b-versatile",
         messages=[{"role": "user", "content": sql_prompt}],
-        max_tokens=300,
     )
-    sql = sql_response.choices[0].message.content.strip()
+    sql = sql_response.choices[0].message.content.strip().replace('```sql', '').replace('```', '')
 
     # Step 2: Execute SQL
     try:
         result = con.execute(sql).fetchdf()
         data = result.to_dict(orient="records")
     except Exception as e:
-        return {"answer": f"SQL execution error: {e}", "sql": sql, "data": []}
+        return {"answer": f"Execution error: {e}", "sql": sql, "data": []}
 
     # Step 3: Natural language answer
-    answer_prompt = f"""You are a business analyst. The user asked: "{req.query}"
-
-The SQL query returned this data:
-{data[:10]}
-
-Give a concise, helpful answer in 2-3 sentences based on the data.
-Do not mention SQL. Be direct and business-focused.
-"""
+    answer_prompt = f"Analyze this data: {data[:10]} and answer the user's question: {req.query}"
     answer_response = client.chat.completions.create(
         model="llama-3.3-70b-versatile",
         messages=[{"role": "user", "content": answer_prompt}],
-        max_tokens=200,
     )
     answer = answer_response.choices[0].message.content.strip()
 
     return {"answer": answer, "sql": sql, "data": data}
 
-
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    # Dynamic port for cloud deployment
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
