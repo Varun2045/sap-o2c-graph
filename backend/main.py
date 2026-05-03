@@ -1,5 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 import duckdb
 import os
@@ -205,6 +207,20 @@ def run_query(req: QueryRequest):
     answer = answer_response.choices[0].message.content.strip()
 
     return {"answer": answer, "sql": sql, "data": data}
+
+# Serve static files (frontend)
+app.mount("/static", StaticFiles(directory="frontend/dist"), name="static")
+
+@app.get("/{full_path:path}")
+async def serve_frontend(full_path: str):
+    """Serve the frontend React app"""
+    frontend_dist = Path(__file__).parent / "frontend" / "dist"
+    index_file = frontend_dist / "index.html"
+    
+    if index_file.exists():
+        return FileResponse(index_file)
+    else:
+        raise HTTPException(status_code=404, detail="Frontend not built")
 
 if __name__ == "__main__":
     import uvicorn

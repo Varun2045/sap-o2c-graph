@@ -1,0 +1,18 @@
+services:
+  # Single service serving both backend API and frontend
+  - type: web
+    name: sap-o2c-graph
+    runtime: python
+    plan: free
+    buildCommand: |
+      pip install -r requirements.txt &&
+      cd ../frontend &&
+      npm install &&
+      npm run build
+    startCommand: python main.py
+    envVars:
+      - key: GROQ_API_KEY
+        sync: false
+      - key: PORT
+        value: 10000
+    healthCheckPath: /health

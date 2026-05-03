@@ -8,7 +8,7 @@ function App() {
   const [suggestedQueries, setSuggestedQueries] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+  const API_URL = import.meta.env.VITE_API_URL || '';
 
   // Fetch graph data on component mount
   useEffect(() => {
