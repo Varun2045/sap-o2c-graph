@@ -208,6 +208,21 @@ def run_query(req: QueryRequest):
 
     return {"answer": answer, "sql": sql, "data": data}
 
+# Root route to serve frontend
+@app.get("/")
+async def serve_root():
+    """Serve the frontend React app at root"""
+    frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"
+    index_file = frontend_dist / "index.html"
+    
+    print(f"Root route - Looking for frontend at: {frontend_dist}")
+    print(f"Root route - Index file exists: {index_file.exists()}")
+    
+    if index_file.exists():
+        return FileResponse(index_file)
+    else:
+        raise HTTPException(status_code=404, detail=f"Frontend not built. Path: {frontend_dist}")
+
 # Serve static files (frontend)
 frontend_dist_path = Path(__file__).parent.parent / "frontend" / "dist"
 if frontend_dist_path.exists():
@@ -223,10 +238,13 @@ async def serve_frontend(full_path: str):
     frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"
     index_file = frontend_dist / "index.html"
     
+    print(f"Looking for frontend at: {frontend_dist}")
+    print(f"Index file exists: {index_file.exists()}")
+    
     if index_file.exists():
         return FileResponse(index_file)
     else:
-        raise HTTPException(status_code=404, detail="Frontend not built")
+        raise HTTPException(status_code=404, detail=f"Frontend not built. Path: {frontend_dist}")
 
 if __name__ == "__main__":
     import uvicorn
