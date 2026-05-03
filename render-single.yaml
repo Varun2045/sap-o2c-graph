@@ -4,12 +4,8 @@ services:
     name: sap-o2c-graph
     runtime: python
     plan: free
-    buildCommand: |
-      pip install -r requirements.txt &&
-      cd ../frontend &&
-      npm install &&
-      npm run build
-    startCommand: python main.py
+    buildCommand: cd backend; pip install -r requirements.txt; cd ../frontend; npm install; npm run build
+    startCommand: cd backend; python main.py
     envVars:
       - key: GROQ_API_KEY
         sync: false
