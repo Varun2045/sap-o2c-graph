@@ -4,10 +4,10 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "\"C:\\Program Files\\nodejs\\node.exe\" node_modules\\vite\\bin\\vite.js",
-    "build": "\"C:\\Program Files\\nodejs\\node.exe\" node_modules\\vite\\bin\\vite.js build",
+    "dev": "vite",
+    "build": "vite build",
     "lint": "eslint .",
-    "preview": "\"C:\\Program Files\\nodejs\\node.exe\" node_modules\\vite\\bin\\vite.js preview"
+    "preview": "vite preview"
   },
   "dependencies": {
     "react": "^19.2.4",
