@@ -209,12 +209,18 @@ def run_query(req: QueryRequest):
     return {"answer": answer, "sql": sql, "data": data}
 
 # Serve static files (frontend)
-app.mount("/static", StaticFiles(directory="frontend/dist"), name="static")
+frontend_dist_path = Path(__file__).parent.parent / "frontend" / "dist"
+if frontend_dist_path.exists():
+    app.mount("/static", StaticFiles(directory=str(frontend_dist_path)), name="static")
 
 @app.get("/{full_path:path}")
 async def serve_frontend(full_path: str):
     """Serve the frontend React app"""
-    frontend_dist = Path(__file__).parent / "frontend" / "dist"
+    # Don't intercept API routes
+    if full_path.startswith(('graph', 'query', 'health', 'suggested-queries')):
+        raise HTTPException(status_code=404)
+    
+    frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"
     index_file = frontend_dist / "index.html"
     
     if index_file.exists():
